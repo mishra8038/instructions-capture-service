@@ -1,0 +1,30 @@
+server:
+  port: 8080
+  shutdown: graceful
+  tomcat:
+    max-threads: 200
+
+spring:
+  application:
+    name: instructions-capture-service
+mvc:
+  problemdetails:
+    enabled: true
+servlet:
+  multipart:
+    max-file-size: 5MB
+    max-request-size: 5MB
+jackson:
+  serialization:
+    WRITE_DATES_AS_TIMESTAMPS: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  app:
+    kafka:
+      topics:
+        inbound: instructions.inbound
+        outbound: instructions.outbound

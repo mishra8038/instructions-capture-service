@@ -1,0 +1,22 @@
+[
+  {
+    "platform_id": "ACCT123",
+    "trade": {
+      "account": "9876543210",
+      "security": "ABC1234",
+      "type": "B",
+      "amount": 100000,
+      "timestamp": "2025-08-04T21:15:33Z"
+    }
+  },
+  {
+    "platform_id": "PLT2",
+    "trade": {
+      "account": "55500011119999",
+      "security": "xyz999",
+      "type": "SELL",
+      "amount": 5000,
+      "timestamp": "2025-08-05T10:00:00Z"
+    }
+  }
+]

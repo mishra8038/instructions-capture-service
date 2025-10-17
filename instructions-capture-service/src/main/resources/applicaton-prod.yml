@@ -1,0 +1,34 @@
+spring:
+  profiles: prod
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    properties:
+    # TLS/SASL Configuration for Production.
+    # security.protocol: SSL
+    # ssl.truststore.location: ${KAFKA_TRUSTSTORE:/etc/certs/kafka.truststore.jks}
+    # ssl.truststore.password: ${KAFKA_TRUSTSTORE_PASSWORD}
+    consumer:
+      group-id: instructions-capture-service
+      auto-offset-reset: earliest
+      enable.auto.commit: true
+      properties:
+        isolation.level: read_committed
+    producer:
+      acks: all
+      retries: 10
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 120000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.apache.kafka: WARN
+    com.example.instructions: INFO

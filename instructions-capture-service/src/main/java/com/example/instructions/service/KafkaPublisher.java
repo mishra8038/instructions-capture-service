@@ -1,0 +1,31 @@
+package com.example.instructions.service;
+
+import com.example.instructions.model.CanonicalTrade;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Service;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class KafkaPublisher {
+
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
+
+    @Value("${app.kafka.topics.outbound:instructions.outbound}")
+    private String outboundTopic;
+
+    public void publishCanonical(CanonicalTrade trade) {
+        try {
+            String payload = objectMapper.writeValueAsString(trade);
+            kafkaTemplate.send(outboundTopic, payload);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize trade", e);
+        }
+    }
+}

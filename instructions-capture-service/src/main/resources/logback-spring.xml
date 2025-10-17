@@ -1,0 +1,62 @@
+<configuration scan="true" scanPeriod="30 seconds">
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="instructions-capture-service"/>
+
+    <!-- Common pattern for dev: human-readable, shows MDC + level -->
+    <property name="DEV_PATTERN" value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSX} [%thread] %-5level %logger{36} - %msg | mdcs={corr:%X{correlationId} trace:%X{traceId} span:%X{spanId}}%n"/>
+
+    <!-- Console appender for dev -->
+    <appender name="DEV_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${DEV_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- JSON console appender for staging/prod -->
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp/>
+                <pattern>
+                    <pattern>
+                        {
+                        "level":"%level",
+                        "logger":"%logger{36}",
+                        "message":"%replace(%msg){'\"','\\\"'}",
+                        "thread":"%thread",
+                        "app":"${APP_NAME}",
+                        "mdc":{
+                        "correlationId":"%X{correlationId}",
+                        "traceId":"%X{traceId}",
+                        "spanId":"%X{spanId}"
+                        }
+                        }
+                    </pattern>
+                </pattern>
+                <arguments/>
+                <stackTrace/>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- Reduce Kafka/HTTP noise by default -->
+    <logger name="org.apache.kafka" level="INFO"/>
+    <logger name="org.springframework.web" level="INFO"/>
+    <logger name="org.springframework.security" level="INFO"/>
+
+    <!-- App package -->
+    <logger name="com.example.instructions" level="INFO"/>
+
+    <!-- DEV profile: pretty console -->
+    <springProfile name="dev">
+        <root level="DEBUG">
+            <appender-ref ref="DEV_CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- STAGING/PROD: JSON console -->
+    <springProfile name="staging,prod">
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE"/>
+        </root>
+    </springProfile>
+</configuration>

@@ -1,0 +1,29 @@
+spring:
+  profiles: staging
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: instructions-capture-service-test
+      auto-offset-reset: earliest
+      enable.auto.commit: true
+      properties:
+        isolation.level: read_committed
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env,configprops,threaddump,httpexchanges
+
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+    com.example.instructions: INFO
+
+
