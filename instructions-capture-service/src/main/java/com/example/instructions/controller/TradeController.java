@@ -41,11 +41,11 @@ public class TradeController {
         log.debug("uploadCsv received file={}", file);
         if (file.isEmpty()) throw new RuntimeException("Failed to upload file: empty");
         if (file.getContentType() == null) throw new RuntimeException("Failed to upload file: no content type");
-        if (file.getContentType() == "text/csv") {
+        if (file.getContentType().equals("text/csv")) {
             log.info("Received CSV File ={} size={}", file.getOriginalFilename(), file.getSize());
             return ResponseEntity.status(HttpStatus.OK).body(tradeService.processBulkUploadTradeInstrutionsCsv(file));
         }
-        if (file.getContentType() == "application/json") {
+        if (file.getContentType().equals("application/json")) {
             log.info("Received JSON File ={} size={}", file.getOriginalFilename(), file.getSize());
             return ResponseEntity.status(HttpStatus.OK).body(tradeService.processBulkUploadTradeInstrutionsJSON(file));
         }
@@ -66,7 +66,7 @@ public class TradeController {
      * @return well-formed CanonicalTrade object
      */
     @Operation(summary = "Upload Trade Instructions Capture JSON (PlatformTrade with CanonicalTrade payload)")
-    @PutMapping (value = "/instruction", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping (value = "/instruction", consumes = MediaType.APPLICATION_JSON_VALUE)
     public CanonicalTrade processPlatformTrade(@Valid @RequestBody PlatformTrade payload) {
         log.info ("Processing individual Trade Instruction.", payload);
         return tradeService.processTradeInstruction (payload);

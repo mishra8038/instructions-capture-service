@@ -1,5 +1,0 @@
-services:
-  app:
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092

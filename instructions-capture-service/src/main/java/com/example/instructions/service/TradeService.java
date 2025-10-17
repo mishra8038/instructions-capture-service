@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -39,6 +40,7 @@ public class TradeService {
     private final Map<String, CanonicalTrade> auditStore = new ConcurrentHashMap<>();
 
     @PostConstruct void init() { log.info("TradeService initialized"); }
+    @Autowired ObjectMapper objectMapper;
 
     public List<CanonicalTrade> processBulkUploadTradeInstrutionsCsv (MultipartFile file) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8));
@@ -69,7 +71,6 @@ public class TradeService {
 
     public List<CanonicalTrade> processBulkUploadTradeInstrutionsJSON (MultipartFile file) {
         String line;
-        ObjectMapper objectMapper = new ObjectMapper();
         List<CanonicalTrade> results = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) { // Specify charset for InputStreamReader
             System.out.println("Enter text (type 'exit' to quit):");
