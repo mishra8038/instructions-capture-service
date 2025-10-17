@@ -1,8 +1,6 @@
 server:
   port: 8080
   shutdown: graceful
-  tomcat:
-    max-threads: 200
 
 spring:
   application:
@@ -12,8 +10,9 @@ mvc:
     enabled: true
 servlet:
   multipart:
-    max-file-size: 5MB
-    max-request-size: 5MB
+    enabled: true
+    max-file-size: 20MB
+    max-request-size: 20MB
 jackson:
   serialization:
     WRITE_DATES_AS_TIMESTAMPS: false
@@ -23,8 +22,13 @@ management:
     web:
       exposure:
         include: health,info
-  app:
-    kafka:
-      topics:
-        inbound: instructions.inbound
-        outbound: instructions.outbound
+app:
+  kafka:
+    topics:
+      inbound: instructions.inbound
+      outbound: instructions.outbound
+
+  cache:
+    ttl-ms: 600000                    # 10 minutes TTL for hot-window dedup
+    max-entries: 250000               # soft cap; tune per memory budget
+    hmac-secret: ${KEY_HASH_SECRET:dev-secret}

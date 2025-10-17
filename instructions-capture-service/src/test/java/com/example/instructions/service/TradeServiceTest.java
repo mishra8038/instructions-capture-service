@@ -7,7 +7,7 @@ import org.mockito.Mockito;
 
 import java.time.OffsetDateTime;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 class TradeServiceTest {
@@ -28,7 +28,7 @@ class TradeServiceTest {
                         .build())
                 .build();
 
-        CanonicalTrade out = svc.processJson(pt);
+        CanonicalTrade out = svc.processTradeInstruction(pt);
 
         verify(publisher, times(1)).publishCanonical(any());
         assertEquals("ABC1234", out.getSecurity());

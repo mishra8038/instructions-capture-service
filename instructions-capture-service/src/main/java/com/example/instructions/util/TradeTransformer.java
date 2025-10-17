@@ -18,6 +18,7 @@ public final class TradeTransformer {
             "CANCEL", "C"
     );
 
+
     public static CanonicalTrade transform(CanonicalTrade in) {
         if (in == null) return null;
         CanonicalTrade out = CanonicalTrade.builder()

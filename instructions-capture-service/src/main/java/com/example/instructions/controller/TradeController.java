@@ -8,35 +8,68 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Validated
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/trade")
-@Tag(name = "Trade", description = "Trade Instructions ingestion and processing")
+@Tag(name = "Trade", description = "Trade instructions ingestion and processing")
 public class TradeController {
 
     private final TradeService tradeService;
 
+    /**
+     * Method exposes a rest endpoint to upload a csv or json file containing trade instructions.
+     * @param file - the file to be uploaded
+     * @return
+     */
     @Operation(summary = "Upload Trade Instructions Capture CSV")
-    @PostMapping(value = "/instruction/upload/csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public List<CanonicalTrade> uploadCsv(@RequestPart("file") MultipartFile file) {
+    @PostMapping(value = "/instruction/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<CanonicalTrade>> uploadCsv(@RequestParam ("file") MultipartFile file){
         log.info("uploadCsv received filename={} size={}", file.getOriginalFilename(), file.getSize());
         log.debug("uploadCsv received file={}", file);
-        return tradeService.processCsv(file);
+        if (file.isEmpty()) throw new RuntimeException("Failed to upload file: empty");
+        if (file.getContentType() == null) throw new RuntimeException("Failed to upload file: no content type");
+        if (file.getContentType() == "text/csv") {
+            log.info("Received CSV File ={} size={}", file.getOriginalFilename(), file.getSize());
+            return ResponseEntity.status(HttpStatus.OK).body(tradeService.processBulkUploadTradeInstrutionsCsv(file));
+        }
+        if (file.getContentType() == "application/json") {
+            log.info("Received JSON File ={} size={}", file.getOriginalFilename(), file.getSize());
+            return ResponseEntity.status(HttpStatus.OK).body(tradeService.processBulkUploadTradeInstrutionsJSON(file));
+        }
+
+        //if processing of the file by the above methods fails return an empty response
+        Map<String, Object> errorBody = Map.of(
+                "error", "Couldn't parse uploaded file.",
+                "message", "Unknown file type uploaded.",
+                "timestamp", Instant.now()
+        );
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(null);
     }
 
+
+    /**
+     * Method exposes a rest endpoint to process a json payload containing a trade instruction.
+     * @param payload - the trade instruction payload
+     * @return well-formed CanonicalTrade object
+     */
     @Operation(summary = "Upload Trade Instructions Capture JSON (PlatformTrade with CanonicalTrade payload)")
-    @PostMapping(value = "/instruction/upload/json", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public CanonicalTrade uploadJson(@Valid @RequestBody PlatformTrade payload) {
-        log.debug("uploadJson received json", payload);
-        return tradeService.processJson(payload);
+    @PutMapping (value = "/instruction", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public CanonicalTrade processPlatformTrade(@Valid @RequestBody PlatformTrade payload) {
+        log.info ("Processing individual Trade Instruction.", payload);
+        return tradeService.processTradeInstruction (payload);
     }
+
 }

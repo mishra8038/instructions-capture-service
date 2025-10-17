@@ -9,6 +9,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+/**
+ * Kafka publisher service, which can publish a canonical trade to a preconfigured Kafka topic.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -17,8 +20,7 @@ public class KafkaPublisher {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${app.kafka.topics.outbound:instructions.outbound}")
-    private String outboundTopic;
+    @Value("${app.kafka.topics.outbound:instructions.outbound}") private String outboundTopic;
 
     public void publishCanonical(CanonicalTrade trade) {
         try {
