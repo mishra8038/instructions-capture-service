@@ -32,7 +32,7 @@ public class TradeController {
     /**
      * Method exposes a rest endpoint to upload a csv or json file containing trade instructions.
      * @param file - the file to be uploaded
-     * @return
+     * @return - ResponseEntity with a is of well-formed Canonica Trades.
      */
     @Operation(summary = "Upload Trade Instructions Capture CSV")
     @PostMapping(value = "/instruction/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

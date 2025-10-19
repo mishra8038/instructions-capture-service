@@ -37,7 +37,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class KafkaRoundTripIT {
 
     @Container
-    static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka-native").asCompatibleSubstituteFor("apache/kafka"));
+    static final KafkaContainer KAFKA =
+            new KafkaContainer(DockerImageName.parse("apache/kafka-native").asCompatibleSubstituteFor("apache/kafka"))
+                    .withExposedPorts(9092)
+                    //.waitingFor(Wait.forHttp("/health").forPort(9092).forStatusCode(200))
+                    .withStartupTimeout(java.time.Duration.ofSeconds(40));
 
     @Autowired
     KafkaPublisher kafkaPublisher;
@@ -50,8 +54,7 @@ class KafkaRoundTripIT {
         registry.add("app.kafka.topics.outbound", () -> "instructions.outbound");
     }
 
-    @LocalServerPort
-    int port;
+    @LocalServerPort int port;
 
     @Test
     @Order(1)
@@ -71,8 +74,8 @@ class KafkaRoundTripIT {
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:" + port + "/api/v1/trade/instruction/upload/json"))
-                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                .uri(URI.create("http://localhost:" + port + "/api/v1/trade/instruction/upload"))
+                .header("Content-Type", MediaType.MULTIPART_FORM_DATA_VALUE)
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
 

@@ -8,6 +8,7 @@ spring:
 mvc:
   problemdetails:
     enabled: true
+
 servlet:
   multipart:
     enabled: true

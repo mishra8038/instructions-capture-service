@@ -1,6 +1,5 @@
 package com.example.instructions.stream.integration;
 
-
 import com.example.instructions.InstructionsCaptureApplication;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -27,6 +26,20 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * End-to-End test class for validating the behavior of a Kafka Streams-based application.
+ * This test verifies the message transformation pipeline, ensuring that messages
+ * produced on a source Kafka topic are properly consumed, transformed, and produced
+ * to a destination Kafka topic as per the application logic.
+ *
+ * The test utilizes Testcontainers to spin up a Kafka environment and dynamically initializes
+ * properties required to interact with the Kafka setup. It validates the entire round-trip
+ * of producing, consuming, transforming, and verifying the expected output.
+ *
+ * Annotations:
+ * - {@code @SpringBootTest}: Configures the test to bootstrap the Spring Boot application under test.
+ * - {@code @Testcontainers}: Enables Testcontainers support for orchestrating dependencies such as Kafka.
+ */
 @SpringBootTest(classes = InstructionsCaptureApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE) // Streams only; no web required
 @Testcontainers
 class KafkaStreamTransformerTestE2E {
@@ -35,7 +48,10 @@ class KafkaStreamTransformerTestE2E {
     private static final String OUTBOUND_TOPIC = "instructions.outbound";
 
     @Container
-    static final org.testcontainers.kafka.KafkaContainer KAFKA = new org.testcontainers.kafka.KafkaContainer(DockerImageName.parse("apache/kafka-native").asCompatibleSubstituteFor("apache/kafka"));
+    static final org.testcontainers.kafka.KafkaContainer KAFKA = new org.testcontainers.kafka.KafkaContainer(DockerImageName.parse("apache/kafka-native").asCompatibleSubstituteFor("apache/kafka"))
+                                                                    .withExposedPorts(9092)
+                                                                    //.waitingFor(Wait.forHttp("/health").forPort(9092).forStatusCode(200))
+                                                                    .withStartupTimeout(java.time.Duration.ofSeconds(40));
 
     @DynamicPropertySource
     static void springProps(DynamicPropertyRegistry r) {
@@ -43,7 +59,7 @@ class KafkaStreamTransformerTestE2E {
         r.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         r.add("spring.kafka.streams.application-id", () -> "instructions-transformer-it-" + UUID.randomUUID());
         // wire topic names if you externalize them
-        r.add("app.kafka.topics.raw", () -> INBOUND_TOPIC);
+        r.add("app.kafka.topics.inbound", () -> INBOUND_TOPIC);
         r.add("app.kafka.topics.outbound", () -> OUTBOUND_TOPIC);
         // keep logs/data stable for tests
         r.add("spring.profiles.active", () -> "test");
@@ -51,8 +67,7 @@ class KafkaStreamTransformerTestE2E {
 
     @BeforeAll
     static void createTopics() throws Exception {
-        try (AdminClient admin = AdminClient.create(Map.of(
-                "bootstrap.servers", KAFKA.getBootstrapServers()
+        try (AdminClient admin = AdminClient.create(Map.of( "bootstrap.servers", KAFKA.getBootstrapServers()
         ))) {
             // Create topics explicitly (helps when auto-create is disabled)
             var topics = List.of(
@@ -92,7 +107,6 @@ class KafkaStreamTransformerTestE2E {
         List<String> values = new ArrayList<>();
         try (KafkaConsumer<String, String> consumer = buildStringConsumer("streams-it-consumer-" + UUID.randomUUID())) {
             consumer.subscribe(List.of(OUTBOUND_TOPIC));
-
             long deadline = System.currentTimeMillis() + Duration.ofSeconds(15).toMillis();
             while (System.currentTimeMillis() < deadline && values.size() < 2) {
                 ConsumerRecords<String, String> polled = consumer.poll(Duration.ofMillis(500));
@@ -136,4 +150,4 @@ class KafkaStreamTransformerTestE2E {
         p.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed"); // good if EOSv2 is enabled in Streams
         return new KafkaConsumer<>(p);
     }
-}
+} //KafkaStreamTransformerTestE2E

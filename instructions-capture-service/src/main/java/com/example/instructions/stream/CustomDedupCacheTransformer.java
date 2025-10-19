@@ -25,6 +25,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Drops duplicates seen in the hot window (TTL).
  * - Periodically purges expired entries to cap memory.
  */
+
+@Getter
 @Slf4j
 @Profile("kstreams")
 public class CustomDedupCacheTransformer implements ValueTransformerWithKey<String, CanonicalTrade, CanonicalTrade> {
@@ -41,12 +43,6 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
         this.maxEntries = Math.max(10_000, maxEntries);
         this.hmacSecret = Objects.requireNonNull(hmacSecret);
     }
-
-/*    @Override public void init(ProcessorContext<String, CanonicalTrade> context) {
-        this.context = context;
-        // Periodic purge to remove expired keys and perform soft size control.
-        context.schedule(Duration.ofSeconds(Math.max(5, ttlMs / 1000 / 6)), PunctuationType.WALL_CLOCK_TIME, timestamp -> purge(timestamp));
-    }*/
 
     @Override public void init(org.apache.kafka.streams.processor.ProcessorContext context) {
         this.context = context;
@@ -78,7 +74,7 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
     /**
      * Purge expired entries and softly cap the size (O(n) but executed infrequently).
      */
-    private void purge(long now) {
+    void purge(long now) {
         long expiredBefore = now - ttlMs;
         int removed = 0;
 
@@ -115,8 +111,6 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
         }
     }
 
-    // ---------- Dedupe key helpers ----------
-
     /**
      * Builds a privacy-safe dedupe id using HMAC over key business fields.
      */
@@ -150,15 +144,13 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
     @AllArgsConstructor
     private static final class CacheEntry {
         private volatile long seenAt;
-
         void touch(long ts) {
             this.seenAt = ts;
         }
     }
 
     // Supplier helper (if you prefer transformValues(HotCacheTransformer::supplier))
-    public static ValueTransformerWithKeySupplier<String, CanonicalTrade, CanonicalTrade> supplier(
-           long ttlMs, int maxEntries, String hmacSecret) {
+    public static ValueTransformerWithKeySupplier<String, CanonicalTrade, CanonicalTrade> supplier(long ttlMs, int maxEntries, String hmacSecret) {
         return () -> new CustomDedupCacheTransformer(ttlMs, maxEntries, hmacSecret);
     }
 }
