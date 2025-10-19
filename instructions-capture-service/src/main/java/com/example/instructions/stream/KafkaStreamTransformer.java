@@ -43,7 +43,6 @@ public class KafkaStreamTransformer {
         return new StreamsBuilder();
     }
 
-
     /**
      * Transforms a Kafka stream of raw kafka trade data into a stream of canonicalized trade objects with deduplication,
      * transformation, and key partitioning for optimized downstream processing.
@@ -55,8 +54,11 @@ public class KafkaStreamTransformer {
     public KStream<String, CanonicalTrade> tradeTransformPipeline(StreamsBuilder builder) {
         KStream<String, CanonicalTrade> source = builder.stream(rawTopic, Consumed.with(Serdes.String(), tradeSerde));
 
-        // 1) Convert nulls out; 2) in-memory hot-window dedup + cache hit short-circuit;
-        // 3) transform; 4) key by privacy-safe HMAC account for partition affinity; 5) publish
+        // 1) Convert nulls out;
+        // 2) in-memory hot-window dedup + cache hit short-circuit;
+        // 3) transform;
+        // 4) key by privacy-safe HMAC account for partition affinity;
+        // 5) publish
         KStream<String, CanonicalTrade> transformed =
                 source.filter((k, v) -> v != null)
                       .transformValues(() -> new CustomDedupCacheTransformer(ttlMs, maxEntries, hmacSecret))

@@ -54,7 +54,6 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
     public CanonicalTrade transform(String readKey, CanonicalTrade value) {
         // Build a dedupe key from business fields; include timestamp to bound key cardinality.
         String dedupeKey = dedupeId(hmacSecret, value);
-
         long now = System.currentTimeMillis();
         CacheEntry prev = cache.get(dedupeKey);
         if (prev != null && (now - prev.getSeenAt()) < ttlMs) {
@@ -63,6 +62,7 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
             prev.touch(now);
             return null;
         }
+
         // New (or expired) — record presence for future duplicates.
         cache.put(dedupeKey, new CacheEntry(now));
         return value; // downstream TradeTransformer will do the mask/normalize
@@ -72,7 +72,7 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
     public void close() { cache.clear(); }
 
     /**
-     * Purge expired entries and softly cap the size (O(n) but executed infrequently).
+     * Purge expired entries and sof cap stale eviction the size (O(n) but executed infrequently).
      */
     void purge(long now) {
         long expiredBefore = now - ttlMs;
@@ -82,13 +82,10 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
         Iterator<Map.Entry<String, CacheEntry>> it = cache.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<String, CacheEntry> e = it.next();
-            if (e.getValue().getSeenAt() < expiredBefore) {
-                it.remove();
-                removed++;
-            }
+            if (e.getValue().getSeenAt() < expiredBefore) { it.remove(); removed++; }
         }
 
-        // Soft cap: if still too big, evict the stalest ~1% to make room (cheap heuristic)
+        // If the cache is still too big, evict the stalest ~1% to make room (cheap heuristic)
         int size = cache.size();
         int target = maxEntries;
         if (size > target) {
@@ -97,22 +94,14 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
             it = cache.entrySet().iterator();
             int n = 0;
             long cutoff = now - (ttlMs / 2);
-            while (it.hasNext() && n < evict) {
-                if (it.next().getValue().getSeenAt() < cutoff) {
-                    it.remove();
-                    n++;
-                }
-            }
+            while (it.hasNext() && n < evict) { if (it.next().getValue().getSeenAt() < cutoff) { it.remove(); n++; } }
             removed += n;
         }
-
-        if (removed > 0 && log.isInfoEnabled()) {
-            log.info("cache_purge removed={} size_now={}", removed, cache.size());
-        }
+        if (removed > 0 && log.isInfoEnabled()) { log.info("cache_purge removed={} size_now={}", removed, cache.size()); }
     }
 
     /**
-     * Builds a privacy-safe dedupe id using HMAC over key business fields.
+     * Builds a privacy-safe composite dedupe id using HMAC over key business fields.
      */
     static String dedupeId(String secret, CanonicalTrade t) {
         String base = (t.getAccount() == null ? "" : t.getAccount()) + "|" +
@@ -125,7 +114,7 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
     }
 
     /**
-     * Public so topology can also key the record by the same privacy-safe HMAC.
+     * Public so kafka streams topology can also key the record by the same privacy-safe HMAC.
      */
     public static String hmacKey(String secret, String input) {
         try {
@@ -147,7 +136,7 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
         void touch(long ts) {
             this.seenAt = ts;
         }
-    }
+    } // Cache Entry
 
     // Supplier helper (if you prefer transformValues(HotCacheTransformer::supplier))
     public static ValueTransformerWithKeySupplier<String, CanonicalTrade, CanonicalTrade> supplier(long ttlMs, int maxEntries, String hmacSecret) {

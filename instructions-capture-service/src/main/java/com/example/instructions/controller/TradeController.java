@@ -49,7 +49,6 @@ public class TradeController {
             log.info("Received JSON File ={} size={}", file.getOriginalFilename(), file.getSize());
             return ResponseEntity.status(HttpStatus.OK).body(tradeService.processBulkUploadTradeInstrutionsJSON(file));
         }
-
         //if processing of the file by the above methods fails return an empty response
         Map<String, Object> errorBody = Map.of(
                 "error", "Couldn't parse uploaded file.",
