@@ -42,6 +42,14 @@ public class TradeService {
     @PostConstruct void init() { log.info("TradeService initialized"); }
     @Autowired ObjectMapper objectMapper;
 
+    /**
+     * Processes a CSV file containing bulk upload trade instructions, transforms
+     * the records into CanonicalTrade objects, and publishes them to Kafka.
+     *
+     * @param file the CSV file containing trade instructions
+     * @return a list of CanonicalTrade objects after processing and publishing
+     * @throws RuntimeException if an error occurs during CSV parsing or file reading
+     */
     public List<CanonicalTrade> processBulkUploadTradeInstrutionsCsv (MultipartFile file) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8));
              CSVParser parser = CSVFormat.DEFAULT
@@ -69,6 +77,14 @@ public class TradeService {
         }
     } // end processCsv
 
+    /**
+     * Processes a JSON file containing bulk upload trade instructions, transforms
+     * the records into CanonicalTrade objects, and publishes them to Kafka.
+     *
+     * @param file the JSON file containing trade instructions
+     * @return a list of CanonicalTrade objects after processing and publishing
+     * @throws RuntimeException if an error occurs during file reading or JSON parsing
+     */
     public List<CanonicalTrade> processBulkUploadTradeInstrutionsJSON (MultipartFile file) {
         String line;
         List<CanonicalTrade> results = new ArrayList<>();
@@ -91,6 +107,14 @@ public class TradeService {
         }
     } // end processJson
 
+    /**
+     * Processes a trade instruction by transforming a {@link PlatformTrade} payload into a
+     * {@link CanonicalTrade} object and publishing it to Kafka.
+     *
+     * @param payload the {@link PlatformTrade} object containing the trade instruction
+     *                to be processed and transformed
+     * @return the transformed {@link CanonicalTrade} object after processing
+     */
     public CanonicalTrade processTradeInstruction (@Valid PlatformTrade payload) {
         CanonicalTrade transformed = TradeTransformer.transform(payload.getTrade());
         log.debug ("Publishing Canonical Trade on Kafka Inbound.", transformed);
