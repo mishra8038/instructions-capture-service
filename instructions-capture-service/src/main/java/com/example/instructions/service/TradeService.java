@@ -28,7 +28,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Trade service which processes trade instructions and publishes them to Kafka.
- *
  */
 @Slf4j
 @Service
@@ -75,7 +74,7 @@ public class TradeService {
         } catch (IOException e) {
             throw new RuntimeException("CSV parse failed: " + e.getMessage(), e);
         }
-    } // end processCsv
+    } // processBulkUploadTradeInstrutionsCsv
 
     /**
      * Processes a JSON file containing bulk upload trade instructions, transforms
@@ -105,14 +104,12 @@ public class TradeService {
             log.error("IO Exception occurred while transforming json file", e);
             throw new RuntimeException("IO Exception occurred while transforming json file", e);
         }
-    } // end processJson
+    } // processBulkUploadTradeInstrutionsJSON
 
     /**
      * Processes a trade instruction by transforming a {@link PlatformTrade} payload into a
      * {@link CanonicalTrade} object and publishing it to Kafka.
-     *
-     * @param payload the {@link PlatformTrade} object containing the trade instruction
-     *                to be processed and transformed
+     * @param payload the {@link PlatformTrade} object containing the trade instruction to be processed and transformed
      * @return the transformed {@link CanonicalTrade} object after processing
      */
     public CanonicalTrade processTradeInstruction (@Valid PlatformTrade payload) {
@@ -120,6 +117,5 @@ public class TradeService {
         log.debug ("Publishing Canonical Trade on Kafka Inbound.", transformed);
         kafkaPublisher.publishCanonical(transformed);
         return transformed;
-    }
-
+    } // processTradeInstruction
 }

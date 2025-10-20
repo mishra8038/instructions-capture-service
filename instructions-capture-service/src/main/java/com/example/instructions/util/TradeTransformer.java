@@ -28,7 +28,6 @@ public final class TradeTransformer {
      *
      * Values:
      * - Each key corresponds to either itself or its normalized version as the value.
-     *
      * This map is used in the trade transformation process to ensure uniformity in trade type representations.
      */
     private static final Map<String, String> TYPE_MAP = Map.of(
@@ -39,7 +38,6 @@ public final class TradeTransformer {
             "C", "C",
             "CANCEL", "C"
     );
-
 
     /**
      * Transforms a given {@link CanonicalTrade} object into a normalized and standardized canonical form.
@@ -67,8 +65,7 @@ public final class TradeTransformer {
      * If the input is null, the method returns null.
      *
      * @param accountNumber the account number to be masked; may be null
-     * @return the masked account number with all characters except the last four replaced by asterisks,
-     *         or null if the input is null
+     * @return the masked account number with all characters except the last four replaced by asterisks, or null if the input is null
      */
     public static String maskAccount(String accountNumber) {
         if (accountNumber == null) return null;
@@ -81,7 +78,6 @@ public final class TradeTransformer {
      * Normalizes the given security string by converting it to uppercase using the root locale
      * and trimming any leading or trailing whitespace.
      * If the input is null, the method returns null.
-     *
      * @param sec the security string to be normalized; may be null
      * @return the normalized security string, or null if the input is null
      */
@@ -96,7 +92,6 @@ public final class TradeTransformer {
      * maps it to a predefined set of normalized types using a type map. If no
      * mapping is found, it returns the input string in uppercase if its length is 1,
      * or defaults to "U".
-     *
      * @param type the trade type string to be normalized; may be null
      * @return the normalized trade type string, or "U" if the input is null or cannot
      *         be matched to a predefined type
@@ -105,5 +100,5 @@ public final class TradeTransformer {
         if (type == null) return "U";
         String key = type.trim().toUpperCase(Locale.ROOT);
         return TYPE_MAP.getOrDefault(key, key.length() == 1 ? key : "U");
-    }
+    } // normalizeType
 }

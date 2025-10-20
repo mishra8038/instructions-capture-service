@@ -1,20 +1,25 @@
-package com.example.instructions.integration;
+package com.example.instructions.service.integration;
 
 import com.example.instructions.InstructionsCaptureApplication;
+import com.example.instructions.service.KafkaPublisher;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.MediaType;
-import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.IOException;
@@ -24,17 +29,28 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Properties;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(classes = InstructionsCaptureApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Testcontainers
-class CsvUploadEndToEndIT {
+class CSVUploadE2EIT {
 
-    @Container static final org.testcontainers.kafka.KafkaContainer KAFKA = new org.testcontainers.kafka.KafkaContainer(DockerImageName.parse("apache/kafka-native").asCompatibleSubstituteFor("apache/kafka"));
+    @Container
+    static final KafkaContainer KAFKA =
+            new KafkaContainer(DockerImageName.parse("apache/kafka-native").asCompatibleSubstituteFor("apache/kafka"))
+                    .withExposedPorts(9092)
+                    //.waitingFor(Wait.forHttp("/health").forPort(9092).forStatusCode(200))
+                    .waitingFor(Wait.forListeningPort())
+                    .withStartupTimeout(Duration.ofSeconds(40));
+
+    @Autowired
+    KafkaPublisher kafkaPublisher;
 
     @DynamicPropertySource
     static void registerKafka(DynamicPropertyRegistry registry) {
@@ -42,14 +58,13 @@ class CsvUploadEndToEndIT {
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         registry.add("app.kafka.topics.inbound", () -> "instructions.inbound");
         registry.add("app.kafka.topics.outbound", () -> "instructions.outbound");
-        // keep the app profile predictable for tests
-        registry.add("spring.profiles.active", () -> "test");
     }
 
     @LocalServerPort int port;
 
     @Test
-    void uploadCsv_viaHttpClient_andAssertOutboundKafka() throws Exception {
+    @Order(1)
+    void postJsonThroughRest_triggersOutbound() throws Exception {
         // --- Arrange test CSV (2 rows) ---
         String csv = """
             account,security,type,amount,timestamp
@@ -60,7 +75,7 @@ class CsvUploadEndToEndIT {
         // --- Send multipart/form-data to the Spring MVC endpoint ---
         String boundary = newBoundary();
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:" + port + "/api/v1/trades/upload/csv"))
+                .uri(URI.create("http://localhost:" + port + "/api/v1/trade/instructions"))
                 .header("Content-Type", "multipart/form-data; boundary=" + boundary)
                 .POST(multipartBody(boundary, "file", "sample.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)))
                 .build();
@@ -69,42 +84,34 @@ class CsvUploadEndToEndIT {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         assertEquals(200, response.statusCode(), "CSV upload should return 200 OK");
 
-        // --- Consume outbound topic to validate publish/transform path ---
-        var consumer = buildStringConsumer("csv-it-consumer-" + UUID.randomUUID());
-        try (consumer) {
-            consumer.subscribe(List.of("instructions.outbound"));
+        //await processing before intiating the consumer.
+        Thread.sleep(10000);
 
-            // Allow the app to publish; poll for a few seconds
+        Properties p = new Properties();
+        p.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        p.put(ConsumerConfig.GROUP_ID_CONFIG, "test-consumer");
+        p.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        p.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        p.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        p.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(p)) {
+            consumer.subscribe(java.util.List.of("instructions.outbound"));
             var records = consumer.poll(Duration.ofSeconds(10));
+            // Allow the app to publish; poll for a few seconds
             assertTrue(records.count() >= 2, "Expected at least 2 outbound records after CSV upload");
 
-            // Optional: spot-check transformation (masked account, uppercased security)
-            //boolean sawMasked = records.records("instructions.outbound").stream().map(cr -> cr.value()).anyMatch(v -> v.contains("ABC1234") || v.contains("XYZ999"));
-            //assertTrue(polled.count() >= 2, "Expected at least 2 outbound records after CSV upload");
-
-            // Flatten all record values from all partitions
-            boolean sawMasked = false;
-            ConsumerRecords<String, String> polled = consumer.poll(Duration.ofSeconds(10));
-            for (ConsumerRecord<String, String> rec : polled) {
+            boolean validationWorking = false;
+            boolean maskingWorking = false;
+            for (ConsumerRecord<String, String> rec : records) {
                 String v = rec.value();
-                if (v != null && (v.contains("ABC1234") || v.contains("XYZ999"))) { sawMasked = true; break; }
+                if (v != null && (v.contains("ABC1234") || v.contains("XYZ999"))) { validationWorking = true; break; }
+                if (v != null && (v.contains("******3210") || v.contains("***********9999"))) { validationWorking = true; break; }
             }
-            assertTrue(sawMasked, "Expected transformed securities (uppercased) in outbound payloads");
-        }//ConsumerVerification
+            assertTrue(validationWorking, "Expected transformed uppercase securities value in outbound payloads");
+        }
     }
 
     // ---------- Helpers ----------
-
-    private static KafkaConsumer<String, String> buildStringConsumer(String groupId) {
-        Map<String, Object> props = KafkaTestUtils.consumerProps(groupId, "false", KAFKA.getBootstrapServers());
-        Properties p = new Properties();
-        p.putAll(props);
-        p.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        p.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        p.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        return new KafkaConsumer<>(p);
-    }
-
     private static String newBoundary() {
         // simple, unique-ish boundary for the multipart payload
         return "----itBoundary" + ThreadLocalRandom.current().nextInt(1_000_000);

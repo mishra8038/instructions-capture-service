@@ -1,4 +1,4 @@
-package com.example.instructions.integration;
+package com.example.instructions.service.integration;
 
 import com.example.instructions.InstructionsCaptureApplication;
 import com.example.instructions.model.CanonicalTrade;
@@ -16,6 +16,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.KafkaContainer;
@@ -41,6 +42,7 @@ class KafkaRoundTripIT {
             new KafkaContainer(DockerImageName.parse("apache/kafka-native").asCompatibleSubstituteFor("apache/kafka"))
                     .withExposedPorts(9092)
                     //.waitingFor(Wait.forHttp("/health").forPort(9092).forStatusCode(200))
+                    .waitingFor(Wait.forListeningPort())
                     .withStartupTimeout(java.time.Duration.ofSeconds(40));
 
     @Autowired
@@ -58,7 +60,7 @@ class KafkaRoundTripIT {
 
     @Test
     @Order(1)
-    void postJson_triggersOutbound() throws Exception {
+    void postJsonThroughRest_triggersOutbound() throws Exception {
         String json = """
             {
               "platform_id": "ACCT123",
@@ -74,8 +76,8 @@ class KafkaRoundTripIT {
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:" + port + "/api/v1/trade/instruction/upload"))
-                .header("Content-Type", MediaType.MULTIPART_FORM_DATA_VALUE)
+                .uri(URI.create("http://localhost:" + port + "/api/v1/trade/instructions"))
+                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
 
@@ -88,18 +90,17 @@ class KafkaRoundTripIT {
         p.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         p.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         p.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(p)) {
             consumer.subscribe(java.util.List.of("instructions.outbound"));
             var records = consumer.poll(Duration.ofSeconds(10));
-            assertTrue(records.count() > 0, "Expected outbound messages");
+            assertTrue(records.count() > 0, "Expected outbound messages for HTTP Request");
         }
     }
 
 
     @Test
     @Order(2)
-    void publishJson_triggersOutbound() throws Exception {
+    void publishJsonOnTopic_triggersOutbound() throws Exception {
         CanonicalTrade ct = CanonicalTrade.builder()
                 .account("9876543210")
                 .security("abc1234")
@@ -121,7 +122,7 @@ class KafkaRoundTripIT {
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(p)) {
             consumer.subscribe(java.util.List.of("instructions.outbound"));
             var records = consumer.poll(Duration.ofSeconds(10));
-            assertTrue(records.count() > 0, "Expected outbound messages");
+            assertTrue(records.count() > 0, "Expected outbound messages for JSON");
         }
     }
 }

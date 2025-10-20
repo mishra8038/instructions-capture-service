@@ -15,11 +15,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PlatformTrade {
-
-    @NotBlank
-    private String platform_id;
-
-    @Valid
-    @NotNull
-    private CanonicalTrade trade;
-}
+    @NotBlank private String platform_id;
+    @Valid @NotNull private CanonicalTrade trade;
+}//PlatformTrade

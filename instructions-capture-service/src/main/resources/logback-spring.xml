@@ -54,7 +54,7 @@
     </springProfile>
 
     <!-- STAGING/PROD: JSON console -->
-    <springProfile name="staging,prod">
+    <springProfile name="prod">
         <root level="INFO">
             <appender-ref ref="JSON_CONSOLE"/>
         </root>

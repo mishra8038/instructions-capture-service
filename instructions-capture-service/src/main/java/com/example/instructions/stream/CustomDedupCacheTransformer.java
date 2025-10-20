@@ -8,7 +8,6 @@ import org.apache.kafka.streams.kstream.ValueTransformerWithKey;
 import org.apache.kafka.streams.kstream.ValueTransformerWithKeySupplier;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.PunctuationType;
-import org.springframework.context.annotation.Profile;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -25,10 +24,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Drops duplicates seen in the hot window (TTL).
  * - Periodically purges expired entries to cap memory.
  */
-
 @Getter
 @Slf4j
-@Profile("kstreams")
 public class CustomDedupCacheTransformer implements ValueTransformerWithKey<String, CanonicalTrade, CanonicalTrade> {
 
     private final long ttlMs;
@@ -36,6 +33,7 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
     private final String hmacSecret;
 
     private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
+
     private ProcessorContext context;
 
     public CustomDedupCacheTransformer(long ttlMs, int maxEntries, String hmacSecret) {
@@ -47,12 +45,12 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
     @Override public void init(org.apache.kafka.streams.processor.ProcessorContext context) {
         this.context = context;
         // Periodic purge to remove expired keys and perform soft size control.
-        context.schedule(Duration.ofSeconds(Math.max(5, ttlMs / 1000 / 6)), PunctuationType.WALL_CLOCK_TIME, timestamp -> purge(timestamp));
+        context.schedule(Duration.ofSeconds(Math.max(5, ttlMs / 1000 / 6)), PunctuationType.WALL_CLOCK_TIME, this::purge);
     }
 
     @Override
     public CanonicalTrade transform(String readKey, CanonicalTrade value) {
-        // Build a dedupe key from business fields; include timestamp to bound key cardinality.
+        // Build a dedupe key from business fields; include timestamp
         String dedupeKey = dedupeId(hmacSecret, value);
         long now = System.currentTimeMillis();
         CacheEntry prev = cache.get(dedupeKey);
@@ -85,20 +83,20 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
             if (e.getValue().getSeenAt() < expiredBefore) { it.remove(); removed++; }
         }
 
-        // If the cache is still too big, evict the stalest ~1% to make room (cheap heuristic)
+        // If the cache is still too big, evict the stalest ~1% to make room (cheap and fast)
         int size = cache.size();
-        int target = maxEntries;
-        if (size > target) {
-            int evict = Math.max(1, size / 100);
-            // Opportunistic scan—fast and simple; for stricter control, replace with priority queue.
+        if (size > maxEntries) {
+            //evict the stalest 1%
+            int evictTarget = Math.max(1, size / 100);
+            // Opportunistic scan
             it = cache.entrySet().iterator();
-            int n = 0;
+            int evicted = 0;
             long cutoff = now - (ttlMs / 2);
-            while (it.hasNext() && n < evict) { if (it.next().getValue().getSeenAt() < cutoff) { it.remove(); n++; } }
-            removed += n;
+            while (it.hasNext() && evicted < evictTarget) { if (it.next().getValue().getSeenAt() < cutoff) { it.remove(); evicted++; } }
+            removed += evicted;
         }
-        if (removed > 0 && log.isInfoEnabled()) { log.info("cache_purge removed={} size_now={}", removed, cache.size()); }
-    }
+        if (removed > 0 && log.isInfoEnabled()) { log.info("cache_purge removed={} size_now={}", removed, "Cache size now is :" + cache.size()); }
+    } //purge
 
     /**
      * Builds a privacy-safe composite dedupe id using HMAC over key business fields.
@@ -111,7 +109,7 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
                 // round timestamp to minute to reduce key explosion for replays
                 (t.getTimestamp() == null ? "" : t.getTimestamp().toInstant().getEpochSecond() / 60);
         return hmacKey(secret, base);
-    }
+    } //dedupeId
 
     /**
      * Public so kafka streams topology can also key the record by the same privacy-safe HMAC.
@@ -127,7 +125,7 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
         } catch (Exception e) {
             return "0";
         }
-    }
+    } //hmacKey computation
 
     @Getter
     @AllArgsConstructor
@@ -136,9 +134,9 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
         void touch(long ts) {
             this.seenAt = ts;
         }
-    } // Cache Entry
+    } // CacheEntry
 
-    // Supplier helper (if you prefer transformValues(HotCacheTransformer::supplier))
+    // Supplier helper (if you prefer transformValues(CustomDedupCacheTransformer::supplier))
     public static ValueTransformerWithKeySupplier<String, CanonicalTrade, CanonicalTrade> supplier(long ttlMs, int maxEntries, String hmacSecret) {
         return () -> new CustomDedupCacheTransformer(ttlMs, maxEntries, hmacSecret);
     }

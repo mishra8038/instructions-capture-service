@@ -1,6 +1,9 @@
 package com.example.instructions.stream.integration;
 
 import com.example.instructions.InstructionsCaptureApplication;
+import com.example.instructions.model.CanonicalTrade;
+import com.example.instructions.service.KafkaPublisher;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -8,19 +11,21 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -42,7 +47,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest(classes = InstructionsCaptureApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE) // Streams only; no web required
 @Testcontainers
-class KafkaStreamTransformerTestE2E {
+@Slf4j
+class KafkaStreamTransformerE2EIT {
 
     private static final String INBOUND_TOPIC = "instructions.inbound";
     private static final String OUTBOUND_TOPIC = "instructions.outbound";
@@ -50,6 +56,7 @@ class KafkaStreamTransformerTestE2E {
     @Container
     static final org.testcontainers.kafka.KafkaContainer KAFKA = new org.testcontainers.kafka.KafkaContainer(DockerImageName.parse("apache/kafka-native").asCompatibleSubstituteFor("apache/kafka"))
                                                                     .withExposedPorts(9092)
+                                                                    .waitingFor(Wait.forListeningPort())
                                                                     //.waitingFor(Wait.forHttp("/health").forPort(9092).forStatusCode(200))
                                                                     .withStartupTimeout(java.time.Duration.ofSeconds(40));
 
@@ -62,8 +69,11 @@ class KafkaStreamTransformerTestE2E {
         r.add("app.kafka.topics.inbound", () -> INBOUND_TOPIC);
         r.add("app.kafka.topics.outbound", () -> OUTBOUND_TOPIC);
         // keep logs/data stable for tests
-        r.add("spring.profiles.active", () -> "test");
+        r.add("spring.profiles.active", () -> "dev");
     }
+
+    @Autowired KafkaPublisher kafkaPublisher;
+
 
     @BeforeAll
     static void createTopics() throws Exception {
@@ -80,39 +90,45 @@ class KafkaStreamTransformerTestE2E {
 
     @Test
     void roundTrip_transformer_masksAndUppercases() {
-        // Arrange: produce two test trades to RAW_TOPIC
-        try (KafkaProducer<String, String> producer = buildStringProducer()) {
-            // NOTE: one CanonicalTrade per message; Streams consumes JsonSerde<CanonicalTrade>
-            // StringSerializer will write UTF-8 bytes; JsonSerde happily deserializes the JSON bytes.
-            producer.send(new ProducerRecord<>(INBOUND_TOPIC, "key-1", """
-                    {
-                      "account": "9876543210",
-                      "security": "abc1234",
-                      "type": "Buy",
-                      "amount": 100000,
-                      "timestamp": "2025-08-04T21:15:33Z"
-                    }"""));
-            producer.send(new ProducerRecord<>(INBOUND_TOPIC, "key-2", """
-                    {
-                      "account": "55500011119999",
-                      "security": "xyz999",
-                      "type": "SELL",
-                      "amount": 5000,
-                      "timestamp": "2025-08-05T10:00:00Z"
-                    }"""));
-            producer.flush();
+        CanonicalTrade ct = CanonicalTrade.builder()
+                .account("9876543210")
+                .security("abc1234")
+                .type("Buy")
+                .amount(100000)
+                .timestamp(OffsetDateTime.parse("2025-08-04T21:15:33Z"))
+                .build();
+
+        kafkaPublisher.publishCanonical(ct);
+
+        CanonicalTrade ct2 = CanonicalTrade.builder()
+                .account("55500011119999")
+                .security("xyz999")
+                .type("SELL")
+                .amount(5000)
+                .timestamp(OffsetDateTime.parse("2025-08-05T10:00:00Z"))
+                .build();
+
+        kafkaPublisher.publishCanonical(ct);
+
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException ie) {
+            log.debug ("Thread sleep interrupted before consumer poll");
         }
 
-        // Act: consume from OUT_TOPIC and collect records for a short window
+        long deadline = System.currentTimeMillis() + Duration.ofSeconds(15).toMillis();
         List<String> values = new ArrayList<>();
+
+
+        // Act: consume from OUT_TOPIC and collect records for a short window
         try (KafkaConsumer<String, String> consumer = buildStringConsumer("streams-it-consumer-" + UUID.randomUUID())) {
             consumer.subscribe(List.of(OUTBOUND_TOPIC));
-            long deadline = System.currentTimeMillis() + Duration.ofSeconds(15).toMillis();
             while (System.currentTimeMillis() < deadline && values.size() < 2) {
                 ConsumerRecords<String, String> polled = consumer.poll(Duration.ofMillis(500));
                 polled.forEach(rec -> values.add(rec.value()));
             }
         }
+
 
         // Assert: we saw at least two transformed messages
         assertTrue(values.size() >= 2, "Expected at least 2 outbound transformed records");

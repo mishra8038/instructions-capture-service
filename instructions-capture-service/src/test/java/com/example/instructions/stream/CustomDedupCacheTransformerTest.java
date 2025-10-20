@@ -6,7 +6,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.time.Instant;
 import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,7 +22,7 @@ class CustomDedupCacheTransformerTest {
     void setUp() {
         mockContext = Mockito.mock(org.apache.kafka.streams.processor.ProcessorContext.class);
         // TTL = 200ms, maxEntries = 100, dummy secret
-        transformer = new CustomDedupCacheTransformer(200, 100, "test-secret");
+        transformer = new CustomDedupCacheTransformer(20, 100, "test-secret");
         transformer.init(mockContext);
     }
 
@@ -64,7 +63,6 @@ class CustomDedupCacheTransformerTest {
         assertNull(second, "Duplicate within TTL should be dropped");
     }
 
-
     /**
      * Verifies that a new trade instance is allowed after the Time-To-Live (TTL)
      * for a cached entry has expired.
@@ -98,12 +96,14 @@ class CustomDedupCacheTransformerTest {
                 .build();
 
         CanonicalTrade first = transformer.transform("k1", trade);
-        Thread.sleep(1000); // TTL = 200ms, so expire the cache entry
+        Thread.sleep(10000); // TTL = 20ms, so expire the cache entry and assume the purge would remove it.
+        // purge executes scheduled at 5ms  -
         CanonicalTrade second = transformer.transform("k1", trade);
 
         assertNotNull(first);
         assertNotNull(second);
-        assertNotEquals(first, second, "After TTL expiry, new instance should be accepted");
+
+        assertNotEquals(first, second, "After TTL expiry, new instance should be accepted as a new entry and that object should be distinct from the original");
     }
 
     /**

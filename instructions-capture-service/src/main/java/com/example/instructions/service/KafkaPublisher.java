@@ -21,7 +21,6 @@ public class KafkaPublisher {
     private final ObjectMapper objectMapper;
 
     @Value("${app.kafka.topics.outbound:instructions.outbound}") private String outboundTopic;
-
     public void publishCanonical(CanonicalTrade trade) {
         try {
             String payload = objectMapper.writeValueAsString(trade);
@@ -30,4 +29,4 @@ public class KafkaPublisher {
             throw new RuntimeException("Failed to serialize trade", e);
         }
     }
-}
+} //KafkaPublisher

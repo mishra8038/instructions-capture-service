@@ -21,20 +21,13 @@ import java.time.OffsetDateTime;
 @Slf4j
 public class CanonicalTrade {
 
-    @NotBlank
-    private String account;
-
-    @NotBlank
-    private String security;
-
+    @NotBlank private String account;
+    @NotBlank private String security;
 
     @NotBlank
     @Pattern(regexp = "B|S|C|Buy|Sell|Cancel|.*", message = "Invalid trade type code")
     private String type;
 
-    @Positive
-    private long amount;
-
-    @NotNull
-    private OffsetDateTime timestamp;
+    @Positive private long amount;
+    @NotNull private OffsetDateTime timestamp;
 }

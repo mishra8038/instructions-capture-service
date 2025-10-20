@@ -6,7 +6,7 @@ spring:
     include-stacktrace: always
     include-message: always
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092} # default value is localhost:9092
     consumer:
       group-id: instructions-capture-service-dev
       auto-offset-reset: earliest
@@ -42,7 +42,9 @@ app:
     topics:
       inbound: instructions.inbound
       outbound: instructions.outbound
-  cache:
-    ttl-ms: 600000                    # 10 minutes TTL for hot-window dedup
-    max-entries: 250000               # soft cap; tune per memory budget
-    hmac-secret: ${KEY_HASH_SECRET:dev-secret}
+
+  kafkastreams: true
+  kafkastreamscache:
+      ttl-ms: 60000                       # 10 minutes TTL for hot-window dedup
+      max-entries: 250000                 # soft cap; tune per memory budget
+      hmac-secret: ${KEY_HASH_SECRET:dev-secret}

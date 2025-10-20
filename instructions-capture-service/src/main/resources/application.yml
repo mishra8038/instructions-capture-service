@@ -23,13 +23,15 @@ management:
     web:
       exposure:
         include: health,info
+
 app:
   kafka:
     topics:
       inbound: instructions.inbound
       outbound: instructions.outbound
 
-  cache:
-    ttl-ms: 600000                    # 10 minutes TTL for hot-window dedup
-    max-entries: 250000               # soft cap; tune per memory budget
-    hmac-secret: ${KEY_HASH_SECRET:dev-secret}
+  kafkastreams: true
+  kafkastreamscache:
+      ttl-ms: 60000                       # 10 minutes TTL for hot-window dedup
+      max-entries: 250000                 # soft cap; tune per memory budget
+      hmac-secret: ${KEY_HASH_SECRET:dev-secret}
