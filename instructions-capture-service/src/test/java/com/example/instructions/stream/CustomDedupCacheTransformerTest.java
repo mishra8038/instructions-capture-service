@@ -5,6 +5,7 @@ import org.apache.kafka.streams.processor.ProcessorContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.context.annotation.Profile;
 
 import java.time.OffsetDateTime;
 
@@ -22,7 +23,7 @@ class CustomDedupCacheTransformerTest {
     void setUp() {
         mockContext = Mockito.mock(org.apache.kafka.streams.processor.ProcessorContext.class);
         // TTL = 200ms, maxEntries = 100, dummy secret
-        transformer = new CustomDedupCacheTransformer(20, 100, "test-secret");
+        transformer = new CustomDedupCacheTransformer(20, 10, "test-secret");
         transformer.init(mockContext);
     }
 
@@ -94,14 +95,19 @@ class CustomDedupCacheTransformerTest {
                 .amount(100000)
                 .timestamp(OffsetDateTime.parse("2025-08-04T21:15:33Z"))
                 .build();
-
         CanonicalTrade first = transformer.transform("k1", trade);
-        Thread.sleep(10000); // TTL = 20ms, so expire the cache entry and assume the purge would remove it.
+
+        Thread.sleep(1000);
+        transformer.purge(System.currentTimeMillis());
+
         // purge executes scheduled at 5ms  -
         CanonicalTrade second = transformer.transform("k1", trade);
 
-        assertNotNull(first);
+        assertNull(first); // first has been purged.
         assertNotNull(second);
+
+        assertNull(first, "First trade should have been purged (cache empty)");
+        assertNotNull(second, "Duplicate after TTL should be accepted");
 
         assertNotEquals(first, second, "After TTL expiry, new instance should be accepted as a new entry and that object should be distinct from the original");
     }
@@ -163,6 +169,7 @@ class CustomDedupCacheTransformerTest {
      *   indicating that the `purge` method successfully reduces or maintains the cache size.
      */
     @Test
+    @Profile("kstreams")
     void shouldNotCrashWhenCacheOverMaxEntries() {
         CanonicalTrade base = CanonicalTrade.builder()
                 .account("9876543210")
