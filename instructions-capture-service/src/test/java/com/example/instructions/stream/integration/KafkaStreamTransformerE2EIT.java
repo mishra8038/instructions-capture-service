@@ -60,7 +60,6 @@ class KafkaStreamTransformerE2EIT {
     static final org.testcontainers.kafka.KafkaContainer KAFKA = new org.testcontainers.kafka.KafkaContainer(DockerImageName.parse("apache/kafka-native").asCompatibleSubstituteFor("apache/kafka"))
                                                                     .withExposedPorts(9092)
                                                                     .waitingFor(Wait.forListeningPort())
-                                                                    //.waitingFor(Wait.forHttp("/health").forPort(9092).forStatusCode(200))
                                                                     .withStartupTimeout(java.time.Duration.ofSeconds(40));
 
     @DynamicPropertySource
@@ -147,16 +146,6 @@ class KafkaStreamTransformerE2EIT {
         assertTrue(sawMask9999, "Expected masked account ***********9999 for 55500011119999");
     }
 
-    // ---------- Helpers ----------
-    private static KafkaProducer<String, String> buildStringProducer() {
-        Properties p = new Properties();
-        p.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
-        p.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        p.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        p.put(ProducerConfig.ACKS_CONFIG, "all");
-        p.put(ProducerConfig.LINGER_MS_CONFIG, "5");
-        return new KafkaProducer<>(p);
-    }
 
     private static KafkaConsumer<String, String> buildStringConsumer(String groupId) {
         Properties p = new Properties();

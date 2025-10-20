@@ -43,7 +43,7 @@
 			"response": []
 		},
 		{
-			"name": "POST JSON: /api/v1/trades/instruction",
+			"name": "POST JSON: /api/v1/trade/instructions",
 			"event": [
 				{
 					"listen": "test",
@@ -82,7 +82,7 @@
 					"raw": "{\n  \"platform_id\": \"ACCT123\",\n  \"trade\": {\n    \"account\": \"9876543210\",\n    \"security\": \"abc1234\",\n    \"type\": \"Buy\",\n    \"amount\": 100000,\n    \"timestamp\": \"2025-08-04T21:15:33Z\"\n  }\n}"
 				},
 				"url": {
-					"raw": "{{baseUrl}}/api/v1/trade/instruction",
+					"raw": "{{baseUrl}}/api/v1/trade/instructions",
 					"host": [
 						"{{baseUrl}}"
 					],
@@ -97,7 +97,7 @@
 			"response": []
 		},
 		{
-			"name": "POST Upload CSV: /api/v1/trade/instrument/upload",
+			"name": "POST Upload CSV: /api/v1/trade/instructions",
 			"event": [
 				{
 					"listen": "test",
@@ -155,7 +155,7 @@
 			"response": []
 		},
 		{
-			"name": "POST Upload JSON: /api/v1/trade/instrument/upload",
+			"name": "POST Upload JSON: /api/v1/trade/instructions",
 			"event": [
 				{
 					"listen": "test",
@@ -197,7 +197,7 @@
 					]
 				},
 				"url": {
-					"raw": "{{baseUrl}}/api/v1/trade/instruction/upload",
+					"raw": "{{baseUrl}}/api/v1/trade/instructions",
 					"host": [
 						"{{baseUrl}}"
 					],
