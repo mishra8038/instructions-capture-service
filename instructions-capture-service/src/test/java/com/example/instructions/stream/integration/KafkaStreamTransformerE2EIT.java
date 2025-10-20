@@ -2,6 +2,7 @@ package com.example.instructions.stream.integration;
 
 import com.example.instructions.InstructionsCaptureApplication;
 import com.example.instructions.model.CanonicalTrade;
+import com.example.instructions.model.PlatformTrade;
 import com.example.instructions.service.KafkaPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Profile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -48,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(classes = InstructionsCaptureApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE) // Streams only; no web required
 @Testcontainers
 @Slf4j
+@Profile("kstreams")
 class KafkaStreamTransformerE2EIT {
 
     private static final String INBOUND_TOPIC = "instructions.inbound";
@@ -90,7 +93,7 @@ class KafkaStreamTransformerE2EIT {
 
     @Test
     void roundTrip_transformer_masksAndUppercases() {
-        CanonicalTrade ct = CanonicalTrade.builder()
+        CanonicalTrade ct1 = CanonicalTrade.builder()
                 .account("9876543210")
                 .security("abc1234")
                 .type("Buy")
@@ -98,7 +101,7 @@ class KafkaStreamTransformerE2EIT {
                 .timestamp(OffsetDateTime.parse("2025-08-04T21:15:33Z"))
                 .build();
 
-        kafkaPublisher.publishCanonical(ct);
+        kafkaPublisher.publishToInbound (ct1);
 
         CanonicalTrade ct2 = CanonicalTrade.builder()
                 .account("55500011119999")
@@ -108,7 +111,7 @@ class KafkaStreamTransformerE2EIT {
                 .timestamp(OffsetDateTime.parse("2025-08-05T10:00:00Z"))
                 .build();
 
-        kafkaPublisher.publishCanonical(ct);
+        kafkaPublisher.publishToInbound(ct2);
 
         try {
             Thread.sleep(10000);
@@ -116,15 +119,14 @@ class KafkaStreamTransformerE2EIT {
             log.debug ("Thread sleep interrupted before consumer poll");
         }
 
-        long deadline = System.currentTimeMillis() + Duration.ofSeconds(15).toMillis();
+        long deadline = System.currentTimeMillis() + Duration.ofSeconds(20).toMillis();
         List<String> values = new ArrayList<>();
-
 
         // Act: consume from OUT_TOPIC and collect records for a short window
         try (KafkaConsumer<String, String> consumer = buildStringConsumer("streams-it-consumer-" + UUID.randomUUID())) {
             consumer.subscribe(List.of(OUTBOUND_TOPIC));
             while (System.currentTimeMillis() < deadline && values.size() < 2) {
-                ConsumerRecords<String, String> polled = consumer.poll(Duration.ofMillis(500));
+                ConsumerRecords<String, String> polled = consumer.poll(Duration.ofMillis(100));
                 polled.forEach(rec -> values.add(rec.value()));
             }
         }

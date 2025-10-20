@@ -10,6 +10,7 @@ import org.apache.kafka.streams.kstream.Produced;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.support.serializer.JsonSerde;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Service;
  * This is a high throughput processor that replaces Kafka Listener if the dev profie kstreams is seected whie execution.
  */
 @Service
-@ConditionalOnProperty(name = "kafkastreams", havingValue = "true")
+@Profile("kstreams")
 public class KafkaStreamTransformer {
 
     @Value("${app.kafka.topics.inbound:instructions.inbound}")

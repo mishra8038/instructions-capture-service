@@ -2,6 +2,7 @@ package com.example.instructions.service.integration;
 
 import com.example.instructions.InstructionsCaptureApplication;
 import com.example.instructions.model.CanonicalTrade;
+import com.example.instructions.model.PlatformTrade;
 import com.example.instructions.service.KafkaPublisher;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -35,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(classes = InstructionsCaptureApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Testcontainers
+@Profile("!kstreams")
 class KafkaRoundTripIT {
 
     @Container
@@ -109,7 +112,7 @@ class KafkaRoundTripIT {
                 .timestamp(OffsetDateTime.parse("2025-08-04T21:15:33Z"))
                 .build();
 
-        kafkaPublisher.publishCanonical(ct);
+        kafkaPublisher.publishToInbound (ct);
 
         Properties p = new Properties();
         p.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
