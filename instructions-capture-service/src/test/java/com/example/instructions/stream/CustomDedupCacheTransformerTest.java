@@ -5,7 +5,6 @@ import org.apache.kafka.streams.processor.ProcessorContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.springframework.context.annotation.Profile;
 
 import java.time.OffsetDateTime;
 
@@ -103,9 +102,6 @@ class CustomDedupCacheTransformerTest {
         // purge executes scheduled at 5ms  -
         CanonicalTrade second = transformer.transform("k1", trade);
 
-        assertNull(first); // first has been purged.
-        assertNotNull(second);
-
         assertNull(first, "First trade should have been purged (cache empty)");
         assertNotNull(second, "Duplicate after TTL should be accepted");
 
@@ -169,7 +165,6 @@ class CustomDedupCacheTransformerTest {
      *   indicating that the `purge` method successfully reduces or maintains the cache size.
      */
     @Test
-    @Profile("kstreams")
     void shouldNotCrashWhenCacheOverMaxEntries() {
         CanonicalTrade base = CanonicalTrade.builder()
                 .account("9876543210")
