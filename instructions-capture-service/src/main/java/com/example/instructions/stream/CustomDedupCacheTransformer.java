@@ -48,6 +48,16 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
         context.schedule(Duration.ofSeconds(Math.max(5, ttlMs / 1000 / 6)), PunctuationType.WALL_CLOCK_TIME, this::purge);
     }
 
+
+    /**
+     * Transforms the given {@link CanonicalTrade} object while applying deduplication logic based on a time-to-live (TTL) window.
+     * If the trade is detected as a duplicate within the configured TTL, the method will return {@code null}.
+     * Otherwise, it updates the deduplication cache and returns the original trade for further processing.
+     *
+     * @param readKey the key associated with the incoming trade, used for Kafka streams processing
+     * @param value the {@link CanonicalTrade} object to be transformed
+     * @return the original {@link CanonicalTrade} object if it is not a duplicate, or {@code null} if it is within the TTL window
+     */
     @Override
     public CanonicalTrade transform(String readKey, CanonicalTrade value) {
         // Build a dedupe key from business fields; include timestamp
@@ -80,7 +90,10 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
         Iterator<Map.Entry<String, CacheEntry>> it = cache.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<String, CacheEntry> e = it.next();
-            if (e.getValue().getSeenAt() < expiredBefore) { it.remove(); removed++; }
+            if (e.getValue().getSeenAt() < expiredBefore) {
+                it.remove();
+                removed++;
+            }
         }
 
         // If the cache is still too big, evict the stalest ~1% to make room (cheap and fast)

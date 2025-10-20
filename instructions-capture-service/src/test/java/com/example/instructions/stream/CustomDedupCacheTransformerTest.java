@@ -24,7 +24,7 @@ class CustomDedupCacheTransformerTest {
     void setUp() {
         mockContext = Mockito.mock(org.apache.kafka.streams.processor.ProcessorContext.class);
         // TTL = 200ms, maxEntries = 100, dummy secret
-        transformer = new CustomDedupCacheTransformer(20, 10, "test-secret");
+        transformer = new CustomDedupCacheTransformer(60, 10, "test-secret");
         transformer.init(mockContext);
     }
 
@@ -96,18 +96,27 @@ class CustomDedupCacheTransformerTest {
                 .amount(100000)
                 .timestamp(OffsetDateTime.parse("2025-08-04T21:15:33Z"))
                 .build();
+
         CanonicalTrade first = transformer.transform("k1", trade);
 
         Thread.sleep(1000);
+        //since the context is mocked we are explictly calling the purge method.
         transformer.purge(System.currentTimeMillis());
 
+        CanonicalTrade trade2 = CanonicalTrade.builder()
+                .account("9876543210")
+                .security("XYZ999")
+                .type("B")
+                .amount(100000)
+                .timestamp(OffsetDateTime.parse("2025-08-04T21:15:33Z"))
+                .build();
         // purge executes scheduled at 5ms  -
-        CanonicalTrade second = transformer.transform("k1", trade);
+        CanonicalTrade second = transformer.transform("k1", trade2);
 
         assertNotNull(first, "First trade is present but not available in the cache (cache empty)");
         assertNotNull(second, "Duplicate after TTL should be accepted");
 
-        assertNotEquals(first, second, "After TTL expiry, new instance should be accepted as a new entry and that object should be distinct from the original");
+        assertNotSame(first, second, "After TTL expiry, new instance should be accepted as a new entry and that object should be distinct from the original");
     }
 
     /**
