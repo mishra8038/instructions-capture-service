@@ -90,14 +90,14 @@
 						"api",
 						"v1",
 						"trade",
-						"instruction"
+						"instructions"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "POST Upload CSV: /api/v1/trade/instructions",
+			"name": "POST Upload CSV: /api/v1/trade/instruments",
 			"event": [
 				{
 					"listen": "test",
@@ -139,7 +139,7 @@
 					]
 				},
 				"url": {
-					"raw": "{{baseUrl}}/api/v1/trade/instruction/upload",
+					"raw": "{{baseUrl}}/api/v1/trade/instructions",
 					"host": [
 						"{{baseUrl}}"
 					],
@@ -147,15 +147,14 @@
 						"api",
 						"v1",
 						"trade",
-						"instruction",
-						"upload"
+						"instructions"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "POST Upload JSON: /api/v1/trade/instructions",
+			"name": "POST Upload JSON: /api/v1/trade/instruments",
 			"event": [
 				{
 					"listen": "test",
@@ -205,8 +204,7 @@
 						"api",
 						"v1",
 						"trade",
-						"instruction",
-						"upload"
+						"instructions"
 					]
 				}
 			},
