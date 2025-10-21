@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(classes = InstructionsCaptureApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE) // Streams only; no web required
 @Testcontainers
 @Slf4j
-@Profile("kstreams2")
+@Profile("kstreams")
 class KafkaStreamTransformerE2EIT {
 
     private static final String INBOUND_TOPIC = "instructions.inbound";

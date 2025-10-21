@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
  * This is a high throughput processor that replaces Kafka Listener if the dev profie kstreams is seected whie execution.
  */
 @Service
-@Profile("kstreams2")
+@Profile("kstreams")
 @EnableKafkaStreams
 public class KafkaStreamTransformer {
 
