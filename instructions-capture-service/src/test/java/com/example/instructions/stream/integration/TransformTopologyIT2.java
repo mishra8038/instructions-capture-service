@@ -1,22 +1,27 @@
 package com.example.instructions.stream.integration;
 
-import com.example.instructions.InstructionsCaptureApplication;
+import com.example.instructions.InstructionsCaptureApplication; // or your @SpringBootApplication class
 import com.example.instructions.model.CanonicalTrade;
 import com.example.instructions.service.KafkaPublisher;
+import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.PortBinding;
+import com.github.dockerjava.api.model.Ports;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Profile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -27,41 +32,44 @@ import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * End-to-End test class for validating the behavior of a Kafka Streams-based application.
- * This test verifies the message transformation pipeline, ensuring that messages
- * produced on a source Kafka topic are properly consumed, transformed, and produced
- * to a destination Kafka topic as per the application logic.
- *
- * The test utilizes Testcontainers to spin up a Kafka environment and dynamically initializes
- * properties required to interact with the Kafka setup. It validates the entire round-trip
- * of producing, consuming, transforming, and verifying the expected output.
- *
- * Annotations:
- * - {@code @SpringBootTest}: Configures the test to bootstrap the Spring Boot application under test.
- * - {@code @Testcontainers}: Enables Testcontainers support for orchestrating dependencies such as Kafka.
+ * End-to-end roundtrip test:
+ *  - Starts a Kafka broker (Testcontainers)
+ *  - Bootstraps the Spring Kafka Streams topology
+ *  - Produces CanonicalTrade JSON to instructions.inbound
+ *  - Consumes transformed messages from instructions.outbound
  */
-@SpringBootTest(classes = InstructionsCaptureApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE) // Streams only; no web required
+@SpringBootTest(classes = InstructionsCaptureApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE )// Streams only
+@Profile("kstreams")
 @Testcontainers
 @Slf4j
-@Profile("kstreams2")
-class KafkaStreamTransformerE2EIT {
+class TransformTopologyIT2 {
 
     private static final String INBOUND_TOPIC = "instructions.inbound";
     private static final String OUTBOUND_TOPIC = "instructions.outbound";
 
+    @Autowired KafkaPublisher kafkaPublisher;
+
+    // Single-node Kafka for the test
     @Container
-    static final org.testcontainers.kafka.KafkaContainer KAFKA = new org.testcontainers.kafka.KafkaContainer(DockerImageName.parse("apache/kafka-native")
-                                                                    .asCompatibleSubstituteFor("apache/kafka"))
-                                                                    .withExposedPorts(9092)
-                                                                    .waitingFor(Wait.forListeningPort())
-                                                                    .withStartupTimeout(java.time.Duration.ofSeconds(40));
+    static final org.testcontainers.kafka.KafkaContainer KAFKA = new org.testcontainers.kafka.KafkaContainer(
+            DockerImageName.parse("apache/kafka-native")
+            //DockerImageName.parse("confluentinc/cp-kafka:8.1.0")
+            .asCompatibleSubstituteFor("apache/kafka"))
+            .withExposedPorts(9092)
+            .withCreateContainerCmdModifier(cmd -> {
+                cmd.getHostConfig().withPortBindings(
+                        new PortBinding(Ports.Binding.bindPort(9092), new ExposedPort(9092))
+                );
+            })
+            .waitingFor(Wait.forListeningPort())
+            .withStartupTimeout(java.time.Duration.ofSeconds(20));
 
     @DynamicPropertySource
     static void springProps(DynamicPropertyRegistry r) {
-        KAFKA.start();
+        //KAFKA.start();
         r.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         r.add("spring.kafka.streams.application-id", () -> "instructions-transformer-it-" + UUID.randomUUID());
         // wire topic names if you externalize them
@@ -71,14 +79,9 @@ class KafkaStreamTransformerE2EIT {
         r.add("spring.profiles.active", () -> "kstreams");
     }
 
-    @Autowired KafkaPublisher kafkaPublisher;
-
-
     @BeforeAll
     static void createTopics() throws Exception {
-        try (AdminClient admin = AdminClient.create(Map.of( "bootstrap.servers", KAFKA.getBootstrapServers()
-        ))) {
-            // Create topics explicitly (helps when auto-create is disabled)
+        try (AdminClient admin = AdminClient.create(Map.of("bootstrap.servers", KAFKA.getBootstrapServers()))) {
             var topics = List.of(
                     new NewTopic(INBOUND_TOPIC, 3, (short) 1),
                     new NewTopic(OUTBOUND_TOPIC, 3, (short) 1)
@@ -88,8 +91,11 @@ class KafkaStreamTransformerE2EIT {
     }
 
     @Test
-    void roundTrip_transformer_masksAndUppercases() {
-        for (int i = 0; i < 2; i++) {
+    void roundTrip_masksAccount_and_UppercasesSecurity() {
+
+        System.out.println ("Kafka container mapped port listening at: " + KAFKA.getMappedPort(9092));
+        System.out.println ("Kafka Bootstrap Servers: " + KAFKA.getBootstrapServers());
+        for (int i = 0; i < 10; i++) {
             CanonicalTrade ct = CanonicalTrade.builder()
                     .account("55500011110000"+i)
                     .security("xyz999-"+i)
@@ -100,34 +106,28 @@ class KafkaStreamTransformerE2EIT {
             kafkaPublisher.publishToInbound(ct);
         }
 
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException ie) {
-            log.debug ("Thread sleep interrupted before consumer poll");
-        }
-
-        long deadline = System.currentTimeMillis() + Duration.ofSeconds(20).toMillis();
+        // Act: consume transformed messages from outbound
         List<String> values = new ArrayList<>();
 
-        // Act: consume from OUT_TOPIC and collect records for a short window
         try (KafkaConsumer<String, String> consumer = buildStringConsumer("streams-it-consumer-" + UUID.randomUUID())) {
             consumer.subscribe(List.of(OUTBOUND_TOPIC));
+            long deadline = System.currentTimeMillis() + Duration.ofSeconds(20).toMillis();
             while (System.currentTimeMillis() < deadline && values.size() < 2) {
-                ConsumerRecords<String, String> polled = consumer.poll(Duration.ofMillis(100));
-                System.out.println ("Consumed " + polled.count() + " records");
-                System.out.println ("Consumed Records " + polled);
+                ConsumerRecords<String, String> polled = consumer.poll(Duration.ofMillis(500));
+                System.out.println ("Polled:" + polled);
                 polled.forEach(rec -> values.add(rec.value()));
-            }
-        }
+                System.out.println ("Polled:" + polled);
+            }//while
+        }//consumer
 
-        // Assert: we saw at least two transformed messages
+        // Assert: we saw at least two records
         assertTrue(values.size() >= 2, "Expected at least 2 outbound transformed records");
 
-        // Assert: security uppercased & account masked (mask keeps last 4 digits)
+        // Assert: transformation effects
         boolean sawUpperABC = values.stream().anyMatch(v -> v.contains("\"security\":\"ABC1234\""));
         boolean sawUpperXYZ = values.stream().anyMatch(v -> v.contains("\"security\":\"XYZ999\""));
         boolean sawMask3210 = values.stream().anyMatch(v -> v.contains("\"account\":\"******3210\""));
-        boolean sawMask9999 = values.stream().anyMatch(v -> v.contains("\"account\":\"***********9999\"")); // 13-digit -> 9 stars + 4 digits
+        boolean sawMask9999 = values.stream().anyMatch(v -> v.contains("\"account\":\"***********9999\""));
 
         assertTrue(sawUpperABC, "Expected ABC1234 uppercased in outbound");
         assertTrue(sawUpperXYZ, "Expected XYZ999 uppercased in outbound");
@@ -135,6 +135,17 @@ class KafkaStreamTransformerE2EIT {
         assertTrue(sawMask9999, "Expected masked account ***********9999 for 55500011119999");
     }
 
+    // ---------- Helpers ----------
+
+    private static KafkaProducer<String, String> buildStringProducer() {
+        Properties p = new Properties();
+        p.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        p.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        p.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        p.put(ProducerConfig.ACKS_CONFIG, "all");
+        p.put(ProducerConfig.LINGER_MS_CONFIG, "5");
+        return new KafkaProducer<>(p);
+    }
 
     private static KafkaConsumer<String, String> buildStringConsumer(String groupId) {
         Properties p = new Properties();
@@ -143,7 +154,7 @@ class KafkaStreamTransformerE2EIT {
         p.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         p.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         p.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        p.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed"); // good if EOSv2 is enabled in Streams
+        p.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed"); // if EOSv2 is on
         return new KafkaConsumer<>(p);
     }
-} //KafkaStreamTransformerTestE2E
+}
