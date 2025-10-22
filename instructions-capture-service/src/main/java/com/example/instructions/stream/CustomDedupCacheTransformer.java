@@ -153,4 +153,5 @@ public class CustomDedupCacheTransformer implements ValueTransformerWithKey<Stri
     public static ValueTransformerWithKeySupplier<String, CanonicalTrade, CanonicalTrade> supplier(long ttlMs, int maxEntries, String hmacSecret) {
         return () -> new CustomDedupCacheTransformer(ttlMs, maxEntries, hmacSecret);
     }
-}
+
+} // CustomDedupCacheTransformer

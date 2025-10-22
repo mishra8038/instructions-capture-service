@@ -13,7 +13,6 @@
 				{
 					"listen": "test",
 					"script": {
-						"type": "text/javascript",
 						"exec": [
 							"pm.test('Status code is 200', function () {",
 							"  pm.response.to.have.status(200);",
@@ -22,7 +21,10 @@
 							"  var json = pm.response.json();",
 							"  pm.expect(json.status || json.components?.['ping']?.status).to.eql('UP');",
 							"});"
-						]
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
 					}
 				}
 			],
@@ -30,10 +32,11 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{baseUrl}}/actuator/health",
+					"raw": "localhost:8080/actuator/health",
 					"host": [
-						"{{baseUrl}}"
+						"localhost"
 					],
+					"port": "8080",
 					"path": [
 						"actuator",
 						"health"
@@ -82,10 +85,11 @@
 					"raw": "{\n  \"platform_id\": \"ACCT123\",\n  \"trade\": {\n    \"account\": \"9876543210\",\n    \"security\": \"abc1234\",\n    \"type\": \"Buy\",\n    \"amount\": 100000,\n    \"timestamp\": \"2025-08-04T21:15:33Z\"\n  }\n}"
 				},
 				"url": {
-					"raw": "{{baseUrl}}/api/v1/trade/instructions",
+					"raw": "localhost:8080/api/v1/trade/instructions",
 					"host": [
-						"{{baseUrl}}"
+						"localhost"
 					],
+					"port": "8080",
 					"path": [
 						"api",
 						"v1",
@@ -139,10 +143,11 @@
 					]
 				},
 				"url": {
-					"raw": "{{baseUrl}}/api/v1/trade/instructions",
+					"raw": "localhost:8080/api/v1/trade/instructions",
 					"host": [
-						"{{baseUrl}}"
+						"localhost"
 					],
+					"port": "8080",
 					"path": [
 						"api",
 						"v1",
@@ -196,10 +201,11 @@
 					]
 				},
 				"url": {
-					"raw": "{{baseUrl}}/api/v1/trade/instructions",
+					"raw": "localhost:8080/api/v1/trade/instructions",
 					"host": [
-						"{{baseUrl}}"
+						"localhost"
 					],
+					"port": "8080",
 					"path": [
 						"api",
 						"v1",

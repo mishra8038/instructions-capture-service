@@ -30,7 +30,7 @@ class TradeServiceTest {
 
         CanonicalTrade out = svc.processTradeInstruction(pt);
 
-        verify(publisher, times(1)).publishCanonical(any());
+        verify(publisher, times(1)).publishCanonicalToOutbound(any());
         assertEquals("ABC1234", out.getSecurity());
         assertEquals("B", out.getType());
         assertEquals("******3210", out.getAccount());

@@ -1,13 +1,11 @@
 package com.example.instructions.service;
 
 import com.example.instructions.model.CanonicalTrade;
-import com.example.instructions.model.PlatformTrade;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +21,7 @@ public class KafkaPublisher {
     private final ObjectMapper objectMapper;
 
     @Value("${app.kafka.topics.outbound:instructions.outbound}") private String outboundTopic;
-    public void publishCanonical(CanonicalTrade trade) {
+    public void publishCanonicalToOutbound (CanonicalTrade trade) {
         try {
             String payload = objectMapper.writeValueAsString(trade);
             kafkaTemplate.send(outboundTopic, payload);
@@ -33,7 +31,7 @@ public class KafkaPublisher {
     }
 
     @Value("${app.kafka.topics.inbound:instructions.inbound}") private String inboundTopic;
-    public void publishToInbound (CanonicalTrade ct) {
+    public void publishCanonicalToInbound (CanonicalTrade ct) {
         try {
             String payload = objectMapper.writeValueAsString(ct);
             kafkaTemplate.send(inboundTopic, payload);

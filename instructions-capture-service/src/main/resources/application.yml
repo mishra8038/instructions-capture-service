@@ -9,6 +9,15 @@ mvc:
   problemdetails:
     enabled: true
 
+
+logging:
+  level:
+    root: DEBUG
+    org.springframework: INFO
+    org.apache.kafka: INFO
+    com.example.instructions: DEBUG
+
+
 servlet:
   multipart:
     enabled: true

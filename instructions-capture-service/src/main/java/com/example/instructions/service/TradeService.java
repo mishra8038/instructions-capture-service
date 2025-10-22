@@ -67,7 +67,7 @@ public class TradeService {
                         .build();
                 CanonicalTrade transformed = TradeTransformer.transform(raw);
                 log.debug ("Publishing Canonical Trade on Kafka Inbound.", transformed);
-                kafkaPublisher.publishCanonical(transformed);
+                kafkaPublisher.publishCanonicalToOutbound(transformed);
                 results.add(transformed);
             } // end of csv record processing for loop
             return results;
@@ -93,7 +93,7 @@ public class TradeService {
                 PlatformTrade platformTrade = objectMapper.readValue(line, PlatformTrade.class);
                 CanonicalTrade transformed = TradeTransformer.transform(platformTrade.getTrade());
                 log.debug ("Publishing Canonical Trade on Kafka Inbound.", transformed);
-                kafkaPublisher.publishCanonical(transformed);
+                kafkaPublisher.publishCanonicalToOutbound(transformed);
                 results.add(transformed);
             }
             return results;
@@ -115,7 +115,7 @@ public class TradeService {
     public CanonicalTrade processTradeInstruction (@Valid PlatformTrade payload) {
         CanonicalTrade transformed = TradeTransformer.transform(payload.getTrade());
         log.debug ("Publishing Canonical Trade on Kafka Inbound.", transformed);
-        kafkaPublisher.publishCanonical(transformed);
+        kafkaPublisher.publishCanonicalToOutbound(transformed);
         return transformed;
     } // processTradeInstruction
 }
