@@ -1,5 +1,5 @@
 spring:
-  profiles: dev
+  profiles: kstreams
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     consumer:

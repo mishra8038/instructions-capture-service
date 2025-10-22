@@ -6,7 +6,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
@@ -33,11 +32,10 @@ public class KafkaListenerService {
     @KafkaListener(topics = "${app.kafka.topics.inbound:instructions.inbound}", groupId = "${spring.kafka.consumer.group-id:instructions-capture-service}")
     public void onMessage(String message) {
         try {
-            List<CanonicalTrade> inbound = objectMapper.readValue(message, new TypeReference<List<CanonicalTrade>>() {});
-            for (CanonicalTrade ct : inbound) {
-                CanonicalTrade transformed = TradeTransformer.transform(ct);
-                publisher.publishCanonical(transformed);
-            }
+            //List<CanonicalTrade> inbound = objectMapper.readValue(message, new TypeReference<List<CanonicalTrade>>() {});
+            CanonicalTrade inbound = objectMapper.readValue(message, new TypeReference<CanonicalTrade>(){});
+            publisher.publishCanonicalToOutbound(inbound);
+            //for (CanonicalTrade ct : inbound) { CanonicalTrade transformed = TradeTransformer.transform(ct); }
         } catch (Exception e) {
             log.error("Failed to process inbound batch", e);
         }

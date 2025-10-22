@@ -44,10 +44,10 @@
     <logger name="org.springframework.security" level="INFO"/>
 
     <!-- App package -->
-    <logger name="com.example.instructions" level="INFO"/>
+    <logger name="com.example.instructions" level="DEBUG"/>
 
     <!-- DEV profile: pretty console -->
-    <springProfile name="dev">
+    <springProfile name="dev, kstreams">
         <root level="DEBUG">
             <appender-ref ref="DEV_CONSOLE"/>
         </root>
@@ -55,6 +55,7 @@
 
     <!-- STAGING/PROD: JSON console -->
     <springProfile name="prod">
+        <logger name="com.example.instructions" level="INFO"/>
         <root level="INFO">
             <appender-ref ref="JSON_CONSOLE"/>
         </root>

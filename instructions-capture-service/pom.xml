@@ -66,12 +66,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- JSON Serde -->
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-        </dependency>
-
         <!-- Swagger/OpenAPI -->
         <dependency>
             <groupId>org.springdoc</groupId>

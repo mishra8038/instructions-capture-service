@@ -1,14 +1,24 @@
 package com.example.instructions.service;
 
+import com.example.instructions.InstructionsCaptureApplication;
 import com.example.instructions.model.CanonicalTrade;
 import com.example.instructions.util.TradeTransformer;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Profile;
+import org.springframework.kafka.annotation.EnableKafkaStreams;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-
+@SpringBootTest(classes = InstructionsCaptureApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE) // Streams only; no web required
+@Testcontainers
+@Slf4j
+@Profile("kstreams")
+@EnableKafkaStreams
 class TradeTransformerTest {
 
     @Test

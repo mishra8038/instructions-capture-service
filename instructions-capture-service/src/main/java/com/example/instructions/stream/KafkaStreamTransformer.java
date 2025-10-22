@@ -2,13 +2,13 @@ package com.example.instructions.stream;
 
 import com.example.instructions.model.CanonicalTrade;
 import com.example.instructions.util.TradeTransformer;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Produced;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
  * Kafka stream transformer service, which transforms inbound trades into masked and canonicalized trades sent to the oubound topic.
  * This is a high throughput processor that replaces Kafka Listener if the dev profie kstreams is seected whie execution.
  */
+@Slf4j
 @Service
 @Profile("kstreams")
 @EnableKafkaStreams
@@ -41,10 +42,6 @@ public class KafkaStreamTransformer {
 
     private final JsonSerde<CanonicalTrade> tradeSerde = new JsonSerde<>(CanonicalTrade.class);
 
-    @Bean public StreamsBuilder streamsBuilder() {
-        return new StreamsBuilder();
-    }
-
     /**
      * Transforms a Kafka stream of raw kafka trade data into a stream of canonicalized trade objects with deduplication,
      * transformation, and key partitioning for optimized downstream processing.
@@ -61,11 +58,17 @@ public class KafkaStreamTransformer {
         // 4) key by privacy-safe HMAC account for partition affinity;
         // 5) publish
         KStream<String, CanonicalTrade> transformerPipeline =
-                source.filter((k, ct) -> ct != null)
+                source
+                        .peek((k,v) -> log.debug("Transformer Pipeline: Picked up Cannonical Trade from inbound topic : K" +k + "\tV:" + v))
+                        .filter((k, ct) -> ct != null)
                       .transformValues(() -> new CustomDedupCacheTransformer(ttlMs, maxEntries, hmacSecret))
+                        .peek((k,v) -> log.debug("Transformer Pipeline: After Caching Attempt : K" +k + "\tV:" + v))
                       .filter((k, v) -> v != null)  // null means “dropped as duplicate”
-                      .mapValues(TradeTransformer::transform)
-                      .selectKey((oldKey, trade) -> CustomDedupCacheTransformer.hmacKey(hmacSecret, trade.getAccount()));
+                        .peek((k,v) -> log.debug("Transformer Pipeline: After filtering for dropped packets: K" +k + "\tV:" + v))
+                        .mapValues(TradeTransformer::transform)
+                        .peek((k,v) -> log.debug("Transformer Pipeline: After transformation for dropped packets: K" +k + "\tV:" + v))
+                      .selectKey((oldKey, trade) -> CustomDedupCacheTransformer.hmacKey(hmacSecret, trade.getAccount()))
+                ;
 
         transformerPipeline.to (outTopic, Produced.with(Serdes.String(), tradeSerde));
         return transformerPipeline;
