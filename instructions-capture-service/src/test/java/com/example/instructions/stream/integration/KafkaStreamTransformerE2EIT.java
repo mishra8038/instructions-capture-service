@@ -131,7 +131,6 @@ class KafkaStreamTransformerE2EIT {
         assertTrue(sawUpperCaseInSecurityName, "Expected masked account number in outbound");
     }
 
-
     @Test void roundTrip_transformer_masksAndUppercases() {
         System.out.println ("Starting roundTrip_transformer_test_synchronized : Container exposed port: "  + KAFKA.getMappedPort(9092) );
         for (int i = 0; i < 2; i++) {
